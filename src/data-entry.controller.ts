@@ -16,6 +16,7 @@ import { EntityMatchingService } from './entity-matching.service';
 import { GstService } from './gst.service';
 import { MappingService } from './mapping.service';
 import { AccountingValidationService } from './accounting-validation.service';
+import { PostingService } from './posting.service';
 import { SaveImportMappingDto } from './dto/mapping.dto';
 
 const uploadOptions = {
@@ -35,6 +36,7 @@ export class DataEntryController {
     private readonly gstService: GstService,
     private readonly duplicateService: DuplicateService,
     private readonly accountingValidationService: AccountingValidationService,
+    private readonly postingService: PostingService,
   ) {}
 
   @Post('upload/inspect')
@@ -57,28 +59,11 @@ export class DataEntryController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', uploadOptions))
-  async upload(
-    @UploadedFile() file: Express.Multer.File,
-    @Headers('x-company-id') companyId: string,
-    @Headers('x-user-id') userId: string,
-  ) {
+  async upload(@UploadedFile() file: Express.Multer.File, @Headers('x-company-id') companyId: string, @Headers('x-user-id') userId: string) {
     if (!file) throw new BadRequestException('A file is required.');
     if (!companyId || !userId) throw new BadRequestException('x-company-id and x-user-id headers are required until authentication is integrated.');
     const result = await this.dataEntryService.createImport(file, companyId, userId);
-    return {
-      success: true,
-      data: {
-        importId: result.imported.id,
-        fileName: result.imported.fileName,
-        fileType: result.imported.fileType,
-        sheetName: result.imported.sheetName,
-        status: result.imported.status,
-        totalRows: result.imported.totalRows,
-        columns: result.parsed.headers,
-        mappingSuggestions: result.parsed.mappingSuggestions,
-        previewRows: result.parsed.rows.slice(0, 20),
-      },
-    };
+    return { success: true, data: { importId: result.imported.id, fileName: result.imported.fileName, fileType: result.imported.fileType, sheetName: result.imported.sheetName, status: result.imported.status, totalRows: result.imported.totalRows, columns: result.parsed.headers, mappingSuggestions: result.parsed.mappingSuggestions, previewRows: result.parsed.rows.slice(0, 20) } };
   }
 
   @Get(':importId/mapping')
@@ -136,11 +121,20 @@ export class DataEntryController {
   }
 
   @Get(':importId/accounting/preview')
-  getAccountingPreview(
-    @Param('importId') importId: string,
-    @Headers('x-company-id') companyId: string,
-  ) {
+  getAccountingPreview(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.accountingValidationService.getPreview(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/post')
+  postImport(@Param('importId') importId: string, @Headers('x-company-id') companyId: string, @Headers('x-user-id') userId: string) {
+    if (!companyId || !userId) throw new BadRequestException('x-company-id and x-user-id headers are required until authentication is integrated.');
+    return this.postingService.postImport(importId, companyId, userId).then((data) => ({ success: true, data }));
+  }
+
+  @Get(':importId/posted')
+  getPosted(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.postingService.getPosted(importId, companyId).then((data) => ({ success: true, data }));
   }
 }
