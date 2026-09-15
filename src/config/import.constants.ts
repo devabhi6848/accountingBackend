@@ -4,6 +4,7 @@ export const CANONICAL_IMPORT_FIELDS = [
   'invoice_number',
   'invoice_date',
   'transaction_type',
+  'document_type',
   'item_name',
   'sku',
   'hsn_sac',
@@ -23,6 +24,9 @@ export const CANONICAL_IMPORT_FIELDS = [
   'place_of_supply',
   'payment_mode',
   'description',
+  'gst_inclusive',
+  'rcm',
+  'taxability',
 ] as const;
 
 export type CanonicalImportField = (typeof CANONICAL_IMPORT_FIELDS)[number];
@@ -32,7 +36,8 @@ export const FIELD_ALIASES: Record<CanonicalImportField, string[]> = {
   vendor_name: ['vendor', 'vendor name', 'supplier', 'supplier name'],
   invoice_number: ['invoice', 'invoice no', 'invoice number', 'bill no', 'bill number', 'invoice id'],
   invoice_date: ['date', 'invoice date', 'bill date', 'transaction date'],
-  transaction_type: ['type', 'transaction type', 'voucher type', 'document type'],
+  transaction_type: ['type', 'transaction type', 'voucher type', 'document type', 'supply type', 'supply type code'],
+  document_type: ['document type', 'doc type', 'document type code', 'voucher'],
   item_name: ['item', 'item name', 'product', 'product name', 'description', 'particulars'],
   sku: ['sku', 'item code', 'product code', 'code'],
   hsn_sac: ['hsn', 'hsn code', 'sac', 'sac code', 'hsn/sac'],
@@ -52,6 +57,9 @@ export const FIELD_ALIASES: Record<CanonicalImportField, string[]> = {
   place_of_supply: ['place of supply', 'pos', 'supply state', 'customer state'],
   payment_mode: ['payment mode', 'payment method', 'mode of payment'],
   description: ['description', 'narration', 'remarks', 'notes'],
+  gst_inclusive: ['gst inclusive', 'tax inclusive', 'inclusive tax', 'inclusive gst'],
+  rcm: ['rcm', 'reverse charge', 'reverse charge mechanism'],
+  taxability: ['taxability', 'tax status', 'tax treatment', 'gst treatment', 'supply category'],
 };
 
 export function normalizeHeader(value: string): string {
