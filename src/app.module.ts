@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { DataEntryModule } from './data-entry.module';
 
 @Module({
   imports: [
@@ -7,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
       cache: true,
     }),
+    DataEntryModule,
   ],
 })
 export class AppModule {}
