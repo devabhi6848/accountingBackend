@@ -1,13 +1,18 @@
 import {
   BadRequestException,
+  Body,
   Controller,
+  Get,
   Headers,
+  Param,
   Post,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataEntryService } from './data-entry.service';
+import { MappingService } from './mapping.service';
+import { SaveImportMappingDto } from './dto/mapping.dto';
 
 const uploadOptions = {
   limits: { fileSize: 25 * 1024 * 1024 },
@@ -19,7 +24,10 @@ const uploadOptions = {
 
 @Controller('data-entry')
 export class DataEntryController {
-  constructor(private readonly dataEntryService: DataEntryService) {}
+  constructor(
+    private readonly dataEntryService: DataEntryService,
+    private readonly mappingService: MappingService,
+  ) {}
 
   @Post('upload/inspect')
   @UseInterceptors(FileInterceptor('file', uploadOptions))
@@ -66,5 +74,33 @@ export class DataEntryController {
         previewRows: result.parsed.rows.slice(0, 20),
       },
     };
+  }
+
+  @Get(':importId/mapping')
+  getMapping(
+    @Param('importId') importId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.mappingService.getMapping(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/mapping')
+  saveMapping(
+    @Param('importId') importId: string,
+    @Headers('x-company-id') companyId: string,
+    @Body() dto: SaveImportMappingDto,
+  ) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.mappingService.saveMapping(importId, companyId, dto).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/mapping/confirm')
+  confirmMapping(
+    @Param('importId') importId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.mappingService.confirmMapping(importId, companyId).then((data) => ({ success: true, data }));
   }
 }
