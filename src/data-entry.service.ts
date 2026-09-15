@@ -68,6 +68,37 @@ export class DataEntryService {
     return { parsed, imported };
   }
 
+  async listImports(companyId: string, limit = 50) {
+    const imports = await this.prisma.dataImport.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 200),
+      select: {
+        id: true,
+        companyId: true,
+        createdById: true,
+        fileName: true,
+        fileType: true,
+        sheetName: true,
+        status: true,
+        totalRows: true,
+        processedRows: true,
+        validRows: true,
+        warningRows: true,
+        errorRows: true,
+        duplicateRows: true,
+        detectedHeaders: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return imports.map((item) => ({
+      ...item,
+      fileSize: undefined,
+    }));
+  }
+
   parseFile(file: Express.Multer.File): ParsedImport {
     if (!file?.buffer?.length) throw new BadRequestException('Uploaded file is empty.');
 
