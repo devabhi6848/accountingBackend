@@ -33,7 +33,7 @@ export class DataEntryService {
         createdById: userId,
         fileName: parsed.fileName,
         fileType: parsed.fileType,
-        fileSize: file.size,
+        fileSize: BigInt(file.size),
         sheetName: parsed.sheetName,
         status: 'MAPPING',
         totalRows: parsed.rows.length,
