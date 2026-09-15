@@ -17,6 +17,7 @@ async function main() {
     where: { email: 'demo@example.com' },
     update: { companyId: company.id },
     create: {
+      id: '22222222-2222-2222-2222-222222222222',
       companyId: company.id,
       name: 'Demo User',
       email: 'demo@example.com',
