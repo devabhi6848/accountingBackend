@@ -12,6 +12,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataEntryService } from './data-entry.service';
 import { EntityMatchingService } from './entity-matching.service';
+import { GstService } from './gst.service';
 import { MappingService } from './mapping.service';
 import { SaveImportMappingDto } from './dto/mapping.dto';
 
@@ -29,6 +30,7 @@ export class DataEntryController {
     private readonly dataEntryService: DataEntryService,
     private readonly mappingService: MappingService,
     private readonly entityMatchingService: EntityMatchingService,
+    private readonly gstService: GstService,
   ) {}
 
   @Post('upload/inspect')
@@ -79,48 +81,38 @@ export class DataEntryController {
   }
 
   @Get(':importId/mapping')
-  getMapping(
-    @Param('importId') importId: string,
-    @Headers('x-company-id') companyId: string,
-  ) {
+  getMapping(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.mappingService.getMapping(importId, companyId).then((data) => ({ success: true, data }));
   }
 
   @Post(':importId/mapping')
-  saveMapping(
-    @Param('importId') importId: string,
-    @Headers('x-company-id') companyId: string,
-    @Body() dto: SaveImportMappingDto,
-  ) {
+  saveMapping(@Param('importId') importId: string, @Headers('x-company-id') companyId: string, @Body() dto: SaveImportMappingDto) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.mappingService.saveMapping(importId, companyId, dto).then((data) => ({ success: true, data }));
   }
 
   @Post(':importId/mapping/confirm')
-  confirmMapping(
-    @Param('importId') importId: string,
-    @Headers('x-company-id') companyId: string,
-  ) {
+  confirmMapping(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.mappingService.confirmMapping(importId, companyId).then((data) => ({ success: true, data }));
   }
 
   @Post(':importId/match')
-  matchEntities(
-    @Param('importId') importId: string,
-    @Headers('x-company-id') companyId: string,
-  ) {
+  matchEntities(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.entityMatchingService.matchImport(importId, companyId).then((data) => ({ success: true, data }));
   }
 
   @Get(':importId/matches')
-  getMatches(
-    @Param('importId') importId: string,
-    @Headers('x-company-id') companyId: string,
-  ) {
+  getMatches(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.entityMatchingService.getMatches(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/gst/validate')
+  validateGst(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.gstService.validateImport(importId, companyId).then((data) => ({ success: true, data }));
   }
 }
