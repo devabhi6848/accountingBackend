@@ -37,7 +37,7 @@ export class DuplicateService {
     const historical = await this.prisma.dataImportRow.findMany({
       where: {
         importId: { not: importId },
-        import: { companyId, status: { in: ['READY', 'POSTING', 'COMPLETED'] } },
+        import: { companyId },
         status: { in: ['VALID', 'READY', 'POSTED'] },
       },
       select: { id: true, rowNumber: true, normalizedData: true, rawData: true },

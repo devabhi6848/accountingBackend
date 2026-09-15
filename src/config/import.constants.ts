@@ -27,6 +27,7 @@ export const CANONICAL_IMPORT_FIELDS = [
   'gst_inclusive',
   'rcm',
   'taxability',
+  'gstin',
 ] as const;
 
 export type CanonicalImportField = (typeof CANONICAL_IMPORT_FIELDS)[number];
@@ -60,6 +61,7 @@ export const FIELD_ALIASES: Record<CanonicalImportField, string[]> = {
   gst_inclusive: ['gst inclusive', 'tax inclusive', 'inclusive tax', 'inclusive gst'],
   rcm: ['rcm', 'reverse charge', 'reverse charge mechanism'],
   taxability: ['taxability', 'tax status', 'tax treatment', 'gst treatment', 'supply category'],
+  gstin: ['gstin', 'gstin no', 'gstin number', 'gst no', 'gst number', 'party gstin', 'customer gstin', 'vendor gstin', 'tax id'],
 };
 
 export function normalizeHeader(value: string): string {

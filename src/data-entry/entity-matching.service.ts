@@ -42,7 +42,10 @@ export class EntityMatchingService {
     ]);
 
     const results = imported.rows.map((row) => {
-      const data = ((row.normalizedData ?? row.rawData ?? {}) as Record<string, unknown>);
+      const data = {
+        ...((row.rawData ?? {}) as Record<string, unknown>),
+        ...((row.normalizedData ?? {}) as Record<string, unknown>),
+      };
       const customer = this.findBest(data.customer_name, customers.map((x) => ({ ...x })), 'customer', data);
       const vendor = this.findBest(data.vendor_name, vendors.map((x) => ({ ...x })), 'vendor', data);
       const product = this.findBest(data.item_name, products.map((x) => ({ ...x })), 'product', data);
@@ -101,9 +104,11 @@ export class EntityMatchingService {
     row: Record<string, unknown>,
   ): Candidate | null {
     const query = this.normalize(value);
-    if (!query) return null;
+    const queryGstin = this.normalizeGstin(
+      row.gstin ?? row.customer_gstin ?? row.vendor_gstin ?? row.GSTIN ?? row['Customer GSTIN'] ?? row['Party GSTIN']
+    );
+    if (!query && !queryGstin) return null;
 
-    const queryGstin = this.normalizeGstin(row.gstin ?? row.customer_gstin ?? row.vendor_gstin);
     const querySku = this.normalize(row.sku);
     const queryHsn = this.normalize(row.hsn_sac);
 

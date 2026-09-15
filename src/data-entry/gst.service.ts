@@ -292,7 +292,7 @@ export class GstService {
     const text = String(value).trim().toUpperCase();
     const gstin = text.match(/^(\d{2})[A-Z0-9]{13}$/);
     if (gstin) return gstin[1];
-    const numeric = text.match(/^\d{1,2}$/);
+    const numeric = text.match(/^(\d{1,2})$/);
     if (numeric) return numeric[1].padStart(2, '0');
     const codePrefix = text.match(/^(\d{2})\b/);
     return codePrefix ? codePrefix[1] : null;

@@ -49,7 +49,12 @@ export class AccountingValidationService {
       orderBy: { rowNumber: 'asc' },
     });
 
-    const previews = rows.map((row) => this.buildPreview(row));
+    const accounts = await this.prisma.account.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, name: true, type: true },
+    });
+
+    const previews = rows.map((row) => this.buildPreview(row, accounts));
     const errorRows = previews.filter((row) => row.errors.length > 0).length;
     const warningRows = previews.filter((row) => row.errors.length === 0 && row.warnings.length > 0).length;
     const validRows = previews.length - errorRows - warningRows;
@@ -91,7 +96,7 @@ export class AccountingValidationService {
           validRows,
           warningRows,
           errorRows,
-          status: errorRows > 0 ? 'VALIDATING' : 'READY',
+          status: errorRows > 0 || rows.some((r) => r.status === 'DUPLICATE') ? 'VALIDATING' : 'READY',
         },
       });
     });
@@ -113,6 +118,11 @@ export class AccountingValidationService {
       select: { id: true, status: true, totalRows: true },
     });
     if (!imported) throw new NotFoundException('Import session not found.');
+
+    const accounts = await this.prisma.account.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, name: true, type: true },
+    });
 
     const rows = await this.prisma.dataImportRow.findMany({
       where: { importId },
@@ -136,24 +146,31 @@ export class AccountingValidationService {
       totalRows: imported.totalRows,
       offset,
       limit: Math.min(Math.max(1, limit), 500),
-      rows: rows.map((row) => this.buildPreview(row)),
+      rows: rows.map((row) => this.buildPreview(row, accounts)),
     };
   }
 
-  private buildPreview(row: {
-    id: string;
-    rowNumber: number;
-    status: string;
-    normalizedData: Prisma.JsonValue | null;
-    calculatedGst: Prisma.JsonValue | null;
-    validationErrors: Prisma.JsonValue | null;
-    matchResults: Prisma.JsonValue | null;
-  }): RowPreview {
+  private buildPreview(
+    row: {
+      id: string;
+      rowNumber: number;
+      status: string;
+      normalizedData: Prisma.JsonValue | null;
+      calculatedGst: Prisma.JsonValue | null;
+      validationErrors: Prisma.JsonValue | null;
+      matchResults: Prisma.JsonValue | null;
+    },
+    accounts: Array<{ id: string; name: string; type: string }> = [],
+  ): RowPreview {
     const data = this.asObject(row.normalizedData);
     const gst = this.asObject(row.calculatedGst);
     const errors = this.asStringArray(row.validationErrors);
     const warnings: string[] = [];
     const lines: AccountingLinePreview[] = [];
+
+    if (Array.isArray(gst.issues)) {
+      errors.push(...gst.issues.map(String));
+    }
 
     const transactionType = this.text(data.transaction_type);
     const documentType = this.text(data.document_type);
@@ -170,6 +187,22 @@ export class AccountingValidationService {
       errors.push(`Accounting base mismatch: taxable + GST (${this.money(taxable + totalTax).toFixed(2)}) does not equal total (${total.toFixed(2)}).`);
     }
 
+    if (transactionType) {
+      const validTx = ['sale', 'sales', 'purchase', 'purchases', 'bill', 'invoice', 'credit', 'debit', 'payment', 'receipt', 'journal', 'expwp', 'expwop', 'sezwp', 'sezwop'];
+      const txTokens = transactionType.toLowerCase().split(/[^a-z0-9]+/);
+      if (!txTokens.some((t) => validTx.includes(t))) {
+        errors.push(`Malformed transaction type: "${transactionType}".`);
+      }
+    }
+
+    if (documentType) {
+      const validDoc = ['inv', 'invoice', 'tax_invoice', 'bill', 'crn', 'credit', 'dbn', 'debit', 'receipt', 'voucher'];
+      const docTokens = documentType.toLowerCase().split(/[^a-z0-9]+/);
+      if (!docTokens.some((d) => validDoc.includes(d))) {
+        errors.push(`Malformed document type: "${documentType}".`);
+      }
+    }
+
     const party = this.resolveParty(data);
     const partyAccount = this.resolveMatchedAccount(row.matchResults);
     const isPurchase = /purchase|bill|expense|payable|inward/.test(transactionType);
@@ -177,10 +210,7 @@ export class AccountingValidationService {
     const isDebitNote = /debit|dbn/.test(documentType) || /debit/.test(transactionType);
 
     if (!party) {
-      warnings.push('Customer/vendor could not be identified from the normalized row.');
-    }
-    if (!partyAccount?.accountId) {
-      warnings.push('No ledger account is currently linked to the matched party; posting requires account mapping.');
+      errors.push('Customer or vendor is required for this transaction.');
     }
 
     const partySide: 'DEBIT' | 'CREDIT' = isPurchase ? 'CREDIT' : 'DEBIT';
@@ -188,9 +218,10 @@ export class AccountingValidationService {
     const signMultiplier = isCreditNote || isDebitNote ? -1 : 1;
     const partyAmount = this.money(total * signMultiplier);
 
+    const partyRole = isPurchase ? 'VENDOR_PAYABLE' : 'CUSTOMER_RECEIVABLE';
     if (partyAmount >= 0) {
       lines.push({
-        accountRole: isPurchase ? 'VENDOR_PAYABLE' : 'CUSTOMER_RECEIVABLE',
+        accountRole: partyRole,
         side: partySide,
         amount: Math.abs(partyAmount),
         accountId: partyAccount?.accountId,
@@ -198,7 +229,7 @@ export class AccountingValidationService {
       });
     } else {
       lines.push({
-        accountRole: isPurchase ? 'VENDOR_PAYABLE' : 'CUSTOMER_RECEIVABLE',
+        accountRole: partyRole,
         side: oppositeSide,
         amount: Math.abs(partyAmount),
         accountId: partyAccount?.accountId,
@@ -216,24 +247,106 @@ export class AccountingValidationService {
     if (sgst > 0) lines.push({ accountRole: isPurchase ? 'INPUT_SGST' : 'OUTPUT_SGST', side: isPurchase ? 'DEBIT' : 'CREDIT', amount: sgst });
     if (igst > 0) lines.push({ accountRole: isPurchase ? 'INPUT_IGST' : 'OUTPUT_IGST', side: isPurchase ? 'DEBIT' : 'CREDIT', amount: igst });
 
+    for (const line of lines) {
+      if (!line.accountId && accounts.length > 0) {
+        const resolved = this.resolveAccountForRole(line.accountRole, partyAccount, accounts);
+        if (resolved) {
+          line.accountId = resolved.id;
+          line.accountName = resolved.name;
+        }
+      }
+      if (!line.accountId) {
+        errors.push(`Missing ledger account mapping for ${line.accountRole}.`);
+      }
+    }
+
     const debitTotal = this.money(lines.filter((line) => line.side === 'DEBIT').reduce((sum, line) => sum + line.amount, 0));
     const creditTotal = this.money(lines.filter((line) => line.side === 'CREDIT').reduce((sum, line) => sum + line.amount, 0));
     const balanced = Math.abs(debitTotal - creditTotal) <= EPSILON;
     if (!balanced) errors.push(`Journal is unbalanced: debit ${debitTotal.toFixed(2)}, credit ${creditTotal.toFixed(2)}.`);
 
-    if (row.status === 'DUPLICATE') warnings.push('This row was previously marked as a duplicate and must not be posted automatically.');
+    if (row.status === 'DUPLICATE') {
+      errors.push('Duplicate transaction detected; cannot post duplicate rows.');
+    }
+
+    const uniqueErrors = [...new Set(errors)];
+    const uniqueWarnings = [...new Set(warnings)];
 
     return {
       rowId: row.id,
       rowNumber: row.rowNumber,
-      status: row.status === 'DUPLICATE' ? 'DUPLICATE' : errors.length ? 'ERROR' : warnings.length ? 'WARNING' : 'VALID',
-      errors: [...new Set(errors)],
-      warnings: [...new Set(warnings)],
+      status: row.status === 'DUPLICATE' ? 'DUPLICATE' : uniqueErrors.length ? 'ERROR' : uniqueWarnings.length ? 'WARNING' : 'VALID',
+      errors: uniqueErrors,
+      warnings: uniqueWarnings,
       lines,
       debitTotal,
       creditTotal,
       balanced,
     };
+  }
+
+  private resolveAccountForRole(
+    role: string,
+    partyAccount: { accountId?: string; accountName?: string } | null,
+    accounts: Array<{ id: string; name: string; type: string }>,
+  ): { id: string; name: string } | null {
+    if (role === 'CUSTOMER_RECEIVABLE') {
+      if (partyAccount?.accountId) {
+        const found = accounts.find((a) => a.id === partyAccount.accountId);
+        if (found) return found;
+      }
+      return accounts.find((a) => /accounts?\s+receivable|sundry\s+debtors?|trade\s+receivables?|receivables?/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'VENDOR_PAYABLE') {
+      if (partyAccount?.accountId) {
+        const found = accounts.find((a) => a.id === partyAccount.accountId);
+        if (found) return found;
+      }
+      return accounts.find((a) => /accounts?\s+payable|sundry\s+creditors?|trade\s+payables?|payables?/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'SALES_INCOME') {
+      return accounts.find((a) => /^sales/i.test(a.name) || /sales\s+income/i.test(a.name))
+        ?? accounts.find((a) => a.type.toUpperCase() === 'INCOME') ?? null;
+    }
+
+    if (role === 'PURCHASE_EXPENSE') {
+      return accounts.find((a) => /^purchase/i.test(a.name) || /purchase\s+expense/i.test(a.name))
+        ?? accounts.find((a) => a.type.toUpperCase() === 'EXPENSE') ?? null;
+    }
+
+    if (role === 'OUTPUT_CGST') {
+      return accounts.find((a) => /output.*cgst|cgst.*output/i.test(a.name))
+        ?? accounts.find((a) => /^cgst/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'OUTPUT_SGST') {
+      return accounts.find((a) => /output.*sgst|sgst.*output/i.test(a.name))
+        ?? accounts.find((a) => /^sgst/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'OUTPUT_IGST') {
+      return accounts.find((a) => /output.*igst|igst.*output/i.test(a.name))
+        ?? accounts.find((a) => /^igst/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'INPUT_CGST') {
+      return accounts.find((a) => /input.*cgst|cgst.*input/i.test(a.name))
+        ?? accounts.find((a) => /^cgst/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'INPUT_SGST') {
+      return accounts.find((a) => /input.*sgst|sgst.*input/i.test(a.name))
+        ?? accounts.find((a) => /^sgst/i.test(a.name)) ?? null;
+    }
+
+    if (role === 'INPUT_IGST') {
+      return accounts.find((a) => /input.*igst|igst.*input/i.test(a.name))
+        ?? accounts.find((a) => /^igst/i.test(a.name)) ?? null;
+    }
+
+    return null;
   }
 
   private resolveParty(data: Record<string, unknown>): string | null {
