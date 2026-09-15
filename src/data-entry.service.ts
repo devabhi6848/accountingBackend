@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import * as XLSX from 'xlsx';
+import { PrismaService } from './database/prisma.service';
 import { suggestMappings } from './config/field-mapper';
 
 export interface ParsedImport {
@@ -13,6 +15,59 @@ export interface ParsedImport {
 
 @Injectable()
 export class DataEntryService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createImport(file: Express.Multer.File, companyId: string, userId: string) {
+    const parsed = this.parseFile(file);
+
+    const [company, user] = await Promise.all([
+      this.prisma.company.findUnique({ where: { id: companyId } }),
+      this.prisma.user.findUnique({ where: { id: userId } }),
+    ]);
+    if (!company) throw new NotFoundException('Company not found.');
+    if (!user || user.companyId !== companyId) throw new NotFoundException('User not found for this company.');
+
+    const imported = await this.prisma.dataImport.create({
+      data: {
+        companyId,
+        createdById: userId,
+        fileName: parsed.fileName,
+        fileType: parsed.fileType,
+        fileSize: file.size,
+        sheetName: parsed.sheetName,
+        status: 'MAPPING',
+        totalRows: parsed.rows.length,
+        detectedHeaders: parsed.headers as unknown as Prisma.InputJsonValue,
+        rows: {
+          create: parsed.rows.map((rawData, index) => ({
+            rowNumber: index + 1,
+            rawData: rawData as Prisma.InputJsonValue,
+          })),
+        },
+        mappings: {
+          create: parsed.mappingSuggestions.map((suggestion) => ({
+            sourceColumn: suggestion.sourceColumn,
+            targetField: suggestion.targetField,
+            confidence: suggestion.confidence,
+            isConfirmed: suggestion.confidence >= 0.98,
+          })),
+        },
+      },
+      select: {
+        id: true,
+        fileName: true,
+        fileType: true,
+        sheetName: true,
+        status: true,
+        totalRows: true,
+        detectedHeaders: true,
+        mappings: true,
+      },
+    });
+
+    return { parsed, imported };
+  }
+
   parseFile(file: Express.Multer.File): ParsedImport {
     if (!file?.buffer?.length) throw new BadRequestException('Uploaded file is empty.');
 
