@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  gstin       String?
+  stateCode   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  accounts    Account[]
+  customers   Customer[]
+  vendors     Vendor[]
+  products    Product[]
+  imports     DataImport[]
+  templates   MappingTemplate[]
+  journals    JournalEntry[]
+  auditLogs   AuditLog[]
+
+  @@index([gstin])
+}
+
+model User {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  email       String   @unique
+  passwordHash String
+  role        String   @default("USER")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+  imports     DataImport[]
+  auditLogs   AuditLog[]
+
+  @@index([companyId])
+}
+
+model Account {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  code        String?
+  type        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+  @@index([companyId, type])
+}
+
+model Customer {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  gstin       String?
+  stateCode   String?
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, name])
+  @@index([companyId, gstin])
+}
+
+model Vendor {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  gstin       String?
+  stateCode   String?
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, name])
+  @@index([companyId, gstin])
+}
+
+model Product {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  sku         String?
+  hsnSac      String?
+  unit        String?
+  gstRate     Decimal? @db.Decimal(5, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, name])
+  @@index([companyId, sku])
+  @@index([companyId, hsnSac])
+}
+
+model DataImport {
+  id              String       @id @default(uuid()) @db.Uuid
+  companyId       String       @db.Uuid
+  createdById     String       @db.Uuid
+  fileName        String
+  fileType        String
+  fileSize        BigInt
+  sheetName       String?
+  status          ImportStatus @default(UPLOADED)
+  totalRows       Int          @default(0)
+  processedRows   Int          @default(0)
+  validRows       Int          @default(0)
+  warningRows     Int          @default(0)
+  errorRows       Int          @default(0)
+  duplicateRows   Int          @default(0)
+  detectedHeaders Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  company         Company      @relation(fields: [companyId], references: [id])
+  createdBy       User         @relation(fields: [createdById], references: [id])
+  rows            DataImportRow[]
+  mappings        ColumnMapping[]
+
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+}
+
+model DataImportRow {
+  id              String          @id @default(uuid()) @db.Uuid
+  importId        String          @db.Uuid
+  rowNumber       Int
+  rawData         Json
+  normalizedData  Json?
+  status          ImportRowStatus  @default(PENDING)
+  validationErrors Json?
+  matchResults    Json?
+  calculatedGst   Json?
+  postedJournalId String?         @db.Uuid
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  import          DataImport      @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, rowNumber])
+  @@index([importId, status])
+}
+
+model ColumnMapping {
+  id             String      @id @default(uuid()) @db.Uuid
+  importId       String      @db.Uuid
+  sourceColumn   String
+  targetField    String?
+  confidence     Decimal?    @db.Decimal(5, 4)
+  isConfirmed    Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  import         DataImport  @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, sourceColumn])
+}
+
+model MappingTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  mappings    Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  entryNumber String
+  entryDate   DateTime
+  sourceType  String
+  sourceId    String?
+  narration   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+  lines       JournalEntryLine[]
+
+  @@unique([companyId, entryNumber])
+  @@index([companyId, entryDate])
+}
+
+model JournalEntryLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  journalId   String   @db.Uuid
+  accountId   String   @db.Uuid
+  debit       Decimal  @default(0) @db.Decimal(18, 2)
+  credit      Decimal  @default(0) @db.Decimal(18, 2)
+  description String?
+
+  journal     JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@index([journalId])
+  @@index([accountId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  userId      String?  @db.Uuid
+  action      String
+  entity      String
+  entityId    String?
+  oldValue    Json?
+  newValue    Json?
+  createdAt   DateTime @default(now())
+
+  company     Company @relation(fields: [companyId], references: [id])
+  user        User? @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([entity, entityId])
+}
+
+enum ImportStatus {
+  UPLOADED
+  PARSING
+  MAPPING
+  VALIDATING
+  READY
+  POSTING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ImportRowStatus {
+  PENDING
+  VALID
+  WARNING
+  ERROR
+  DUPLICATE
+  READY
+  POSTED
+  FAILED
+}
