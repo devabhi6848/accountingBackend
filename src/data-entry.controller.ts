@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataEntryService } from './data-entry.service';
+import { DuplicateService } from './duplicate.service';
 import { EntityMatchingService } from './entity-matching.service';
 import { GstService } from './gst.service';
 import { MappingService } from './mapping.service';
@@ -31,6 +32,7 @@ export class DataEntryController {
     private readonly mappingService: MappingService,
     private readonly entityMatchingService: EntityMatchingService,
     private readonly gstService: GstService,
+    private readonly duplicateService: DuplicateService,
   ) {}
 
   @Post('upload/inspect')
@@ -59,10 +61,7 @@ export class DataEntryController {
     @Headers('x-user-id') userId: string,
   ) {
     if (!file) throw new BadRequestException('A file is required.');
-    if (!companyId || !userId) {
-      throw new BadRequestException('x-company-id and x-user-id headers are required until authentication is integrated.');
-    }
-
+    if (!companyId || !userId) throw new BadRequestException('x-company-id and x-user-id headers are required until authentication is integrated.');
     const result = await this.dataEntryService.createImport(file, companyId, userId);
     return {
       success: true,
@@ -114,5 +113,17 @@ export class DataEntryController {
   validateGst(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.gstService.validateImport(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/duplicates/detect')
+  detectDuplicates(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.duplicateService.detectDuplicates(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Get(':importId/duplicates')
+  getDuplicates(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.duplicateService.getDuplicates(importId, companyId).then((data) => ({ success: true, data }));
   }
 }
