@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataEntryService } from './data-entry.service';
+import { EntityMatchingService } from './entity-matching.service';
 import { MappingService } from './mapping.service';
 import { SaveImportMappingDto } from './dto/mapping.dto';
 
@@ -27,6 +28,7 @@ export class DataEntryController {
   constructor(
     private readonly dataEntryService: DataEntryService,
     private readonly mappingService: MappingService,
+    private readonly entityMatchingService: EntityMatchingService,
   ) {}
 
   @Post('upload/inspect')
@@ -102,5 +104,23 @@ export class DataEntryController {
   ) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.mappingService.confirmMapping(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/match')
+  matchEntities(
+    @Param('importId') importId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.entityMatchingService.matchImport(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Get(':importId/matches')
+  getMatches(
+    @Param('importId') importId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.entityMatchingService.getMatches(importId, companyId).then((data) => ({ success: true, data }));
   }
 }
