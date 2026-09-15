@@ -74,8 +74,8 @@ export class AccountingValidationService {
           data: {
             status,
             validationErrors: mergedErrors.length
-              ? mergedErrors as unknown as Prisma.InputJsonValue
-              : null,
+              ? (mergedErrors as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
             matchResults: {
               ...(this.asObject(rows.find((row) => row.id === preview.rowId)?.matchResults)),
               accountingPreview: preview,
@@ -194,7 +194,7 @@ export class AccountingValidationService {
         side: partySide,
         amount: Math.abs(partyAmount),
         accountId: partyAccount?.accountId,
-        accountName: partyAccount?.accountName ?? party,
+        accountName: partyAccount?.accountName ?? (typeof party === 'string' ? party : undefined),
       });
     } else {
       lines.push({
@@ -202,7 +202,7 @@ export class AccountingValidationService {
         side: oppositeSide,
         amount: Math.abs(partyAmount),
         accountId: partyAccount?.accountId,
-        accountName: partyAccount?.accountName ?? party,
+        accountName: partyAccount?.accountName ?? (typeof party === 'string' ? party : undefined),
       });
     }
 

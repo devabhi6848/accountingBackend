@@ -11,13 +11,13 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataEntryService } from './data-entry.service';
-import { DuplicateService } from './duplicate.service';
-import { EntityMatchingService } from './entity-matching.service';
-import { GstService } from './gst.service';
-import { MappingService } from './mapping.service';
-import { AccountingValidationService } from './accounting-validation.service';
-import { PostingService } from './posting.service';
-import { SaveImportMappingDto } from './dto/mapping.dto';
+import { DuplicateService } from './data-entry/duplicate.service';
+import { EntityMatchingService } from './data-entry/entity-matching.service';
+import { GstService } from './data-entry/gst.service';
+import { MappingService } from './data-entry/mapping.service';
+import { AccountingValidationService } from './data-entry/accounting-validation.service';
+import { PostingService } from './data-entry/posting.service';
+import { SaveImportMappingDto } from './data-entry/dto/mapping.dto';
 
 const uploadOptions = {
   limits: { fileSize: 25 * 1024 * 1024 },

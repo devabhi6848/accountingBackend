@@ -80,8 +80,8 @@ export class GstService {
             data: {
               calculatedGst: result as unknown as Prisma.InputJsonValue,
               validationErrors: result.issues.length
-                ? result.issues as unknown as Prisma.InputJsonValue
-                : null,
+                ? (result.issues as unknown as Prisma.InputJsonValue)
+                : Prisma.JsonNull,
               status,
             },
           });
