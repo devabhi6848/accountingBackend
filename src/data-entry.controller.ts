@@ -6,6 +6,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -38,6 +39,13 @@ export class DataEntryController {
     private readonly accountingValidationService: AccountingValidationService,
     private readonly postingService: PostingService,
   ) {}
+
+  @Get('imports')
+  listImports(@Headers('x-company-id') companyId: string, @Query('limit') limit?: string) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    const parsedLimit = limit ? Number(limit) : 50;
+    return this.dataEntryService.listImports(companyId, Number.isFinite(parsedLimit) ? parsedLimit : 50).then((data) => ({ success: true, data }));
+  }
 
   @Post('upload/inspect')
   @UseInterceptors(FileInterceptor('file', uploadOptions))
