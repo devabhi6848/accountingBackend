@@ -15,6 +15,7 @@ import { DuplicateService } from './duplicate.service';
 import { EntityMatchingService } from './entity-matching.service';
 import { GstService } from './gst.service';
 import { MappingService } from './mapping.service';
+import { AccountingValidationService } from './accounting-validation.service';
 import { SaveImportMappingDto } from './dto/mapping.dto';
 
 const uploadOptions = {
@@ -33,6 +34,7 @@ export class DataEntryController {
     private readonly entityMatchingService: EntityMatchingService,
     private readonly gstService: GstService,
     private readonly duplicateService: DuplicateService,
+    private readonly accountingValidationService: AccountingValidationService,
   ) {}
 
   @Post('upload/inspect')
@@ -125,5 +127,20 @@ export class DataEntryController {
   getDuplicates(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
     if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
     return this.duplicateService.getDuplicates(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Post(':importId/accounting/validate')
+  validateAccounting(@Param('importId') importId: string, @Headers('x-company-id') companyId: string) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.accountingValidationService.validateImport(importId, companyId).then((data) => ({ success: true, data }));
+  }
+
+  @Get(':importId/accounting/preview')
+  getAccountingPreview(
+    @Param('importId') importId: string,
+    @Headers('x-company-id') companyId: string,
+  ) {
+    if (!companyId) throw new BadRequestException('x-company-id header is required until authentication is integrated.');
+    return this.accountingValidationService.getPreview(importId, companyId).then((data) => ({ success: true, data }));
   }
 }
