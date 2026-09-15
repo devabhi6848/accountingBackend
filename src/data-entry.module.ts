@@ -6,6 +6,7 @@ import { EntityMatchingService } from './entity-matching.service';
 import { GstService } from './gst.service';
 import { MappingService } from './mapping.service';
 import { AccountingValidationService } from './accounting-validation.service';
+import { PostingService } from './posting.service';
 
 @Module({
   controllers: [DataEntryController],
@@ -16,6 +17,7 @@ import { AccountingValidationService } from './accounting-validation.service';
     GstService,
     DuplicateService,
     AccountingValidationService,
+    PostingService,
   ],
   exports: [
     DataEntryService,
@@ -24,6 +26,7 @@ import { AccountingValidationService } from './accounting-validation.service';
     GstService,
     DuplicateService,
     AccountingValidationService,
+    PostingService,
   ],
 })
 export class DataEntryModule {}
